@@ -26,16 +26,65 @@
         h1, h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
         code { background-color: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
         
+        #main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        #header-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #header-info a {
+            color: var(--text-color);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+        #header-info a:hover {
+            opacity: 0.7;
+        }
+        #header-info svg {
+            width: 24px;
+            height: 24px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+        #header-info .version {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
         #summary-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
             align-items: start;
+            margin-bottom: 20px;
         }
         #summary ul { list-style-type: none; padding-left: 0; }
         #chart-container {
             max-width: 400px;
             margin: 0 auto;
+        }
+        #filter-container {
+            margin-bottom: 20px;
+        }
+        #filter-container label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        #extensionFilter {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
         }
 
         table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 0.9em; }
@@ -56,13 +105,30 @@
     </style>
 </head>
 <body>
-    <h1>Duplicate File Report</h1>
+    <header id="main-header">
+        <h1>Duplicate File Report</h1>
+        <div id="header-info">
+            <span class="version">v0.1.0</span>
+            <a href="https://github.com/pip3-kill-me/duplicate_finder" target="_blank" title="View on GitHub">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                </svg>
+            </a>
+        </div>
+    </header>
     
     <div id="summary-container">
         <div id="summary"></div>
         <div id="chart-container">
             <canvas id="sizeByExtChart"></canvas>
         </div>
+    </div>
+
+    <div id="filter-container">
+        <label for="extensionFilter">Filter by Extension:</label>
+        <select id="extensionFilter">
+            <option value="all">All Files</option>
+        </select>
     </div>
 
     <table id="duplicatesTable">
@@ -80,15 +146,36 @@
     <script>
         const reportData = /*__JSON_DATA_PLACEHOLDER__*/{};
 
+        let allFiles = [];
+        let currentSort = { column: 'size', direction: 'desc' };
+
         window.onload = () => {
             try {
                 const data = reportData;
                 if (!data || !data.duplicates) {
                     throw new Error("Embedded data is missing or invalid.");
                 }
+                
+                allFiles = data.duplicates.flatMap(set => 
+                    set.files.map(file => ({ ...file, hash: set.hash, size: set.size }))
+                );
+
                 renderSummary(data);
-                renderTable(data.duplicates);
+                populateExtensionFilter(allFiles);
                 renderChart(data.size_by_ext);
+                
+                applyFilterAndSort(); // Initial render
+
+                document.getElementById('extensionFilter').addEventListener('change', applyFilterAndSort);
+                document.querySelectorAll('#duplicatesTable th').forEach(header => {
+                    header.addEventListener('click', () => {
+                        const column = header.dataset.column;
+                        const direction = currentSort.column === column && currentSort.direction === 'asc' ? 'desc' : 'asc';
+                        currentSort = { column, direction };
+                        applyFilterAndSort();
+                    });
+                });
+
             } catch (error) {
                 document.getElementById('tableBody').innerHTML = `<tr><td colspan="3">Error loading embedded report data: ${error.message}</td></tr>`;
                 console.error("Failed to load or parse embedded data:", error);
@@ -109,21 +196,54 @@
             `;
         }
         
-        let allFiles = [];
-        function renderTable(duplicateSets) {
+        function populateExtensionFilter(files) {
+            const filterSelect = document.getElementById('extensionFilter');
+            const extensions = [...new Set(files.map(file => file.extension))].sort();
+            extensions.forEach(ext => {
+                const option = document.createElement('option');
+                option.value = ext;
+                option.textContent = ext;
+                filterSelect.appendChild(option);
+            });
+        }
+
+        function applyFilterAndSort() {
+            const filterValue = document.getElementById('extensionFilter').value;
+            
+            let filteredFiles = allFiles;
+            if (filterValue !== 'all') {
+                filteredFiles = allFiles.filter(file => file.extension === filterValue);
+            }
+
+            // Sort the filtered files
+            filteredFiles.sort((a, b) => {
+                const { column, direction } = currentSort;
+                let valA = a[column];
+                let valB = b[column];
+
+                if (column === 'size') {
+                    return direction === 'asc' ? valA - valB : valB - valA;
+                }
+                
+                return direction === 'asc' 
+                    ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+                    : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            updateSortIndicators();
+            redrawTable(filteredFiles);
+        }
+
+        function redrawTable(filesToRender) {
             const tableBody = document.getElementById('tableBody');
             tableBody.innerHTML = '';
-            
-            allFiles = duplicateSets.flatMap(set => 
-                set.files.map(file => ({ ...file, hash: set.hash, size: set.size }))
-            );
 
-            if (allFiles.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="3">No duplicate files found.</td></tr>';
+            if (filesToRender.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3">No matching duplicate files found.</td></tr>';
                 return;
             }
 
-            for (const file of allFiles) {
+            for (const file of filesToRender) {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
@@ -131,6 +251,15 @@
                     <td class="size-col">${formatSize(file.size)}</td>
                 `;
                 tableBody.appendChild(row);
+            }
+        }
+
+        function updateSortIndicators() {
+            document.querySelectorAll('#duplicatesTable th .sort-indicator').forEach(span => span.textContent = '');
+            const { column, direction } = currentSort;
+            const indicator = document.querySelector(`#duplicatesTable th[data-column='${column}'] .sort-indicator`);
+            if (indicator) {
+                indicator.textContent = direction === 'asc' ? ' ▲' : ' ▼';
             }
         }
 
@@ -144,7 +273,7 @@
                 return;
             }
 
-            const chart = new Chart(ctx, {
+            new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: labels,
@@ -191,44 +320,6 @@
                         }
                     }
                 }
-            });
-        }
-
-        let sortDirection = {};
-        document.querySelectorAll('#duplicatesTable th').forEach(header => {
-            header.addEventListener('click', () => {
-                const column = header.dataset.column;
-                const direction = sortDirection[column] === 'asc' ? 'desc' : 'asc';
-                sortAndRedrawTable(column, direction);
-            });
-        });
-
-        function sortAndRedrawTable(column, direction) {
-            document.querySelectorAll('#duplicatesTable th .sort-indicator').forEach(span => span.textContent = '');
-            sortDirection = { [column]: direction };
-            document.querySelector(`#duplicatesTable th[data-column='${column}'] .sort-indicator`).textContent = direction === 'asc' ? '▲' : '▼';
-
-            allFiles.sort((a, b) => {
-                let valA = a[column];
-                let valB = b[column];
-                if (column === 'size') {
-                    return direction === 'asc' ? valA - valB : valB - valA;
-                }
-                return direction === 'asc' 
-                    ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
-                    : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
-            });
-            
-            const tableBody = document.getElementById('tableBody');
-            tableBody.innerHTML = '';
-            allFiles.forEach(file => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
-                    <td class="path-col"><code>${file.path}</code></td>
-                    <td class="size-col">${formatSize(file.size)}</td>
-                `;
-                tableBody.appendChild(row);
             });
         }
 
