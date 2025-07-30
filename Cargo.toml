@@ -1,0 +1,10 @@
+[package]
+name = "duplicate_finder"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rayon = "1.8"
+blake3 = "1.5"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+indicatif = "0.17"
