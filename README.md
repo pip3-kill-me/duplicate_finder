@@ -43,7 +43,7 @@ A high-performance command-line tool written in Rust to find duplicate files bet
 ---
 # Releases
 
-### [v0.1.0 – Initial Release](https://github.com/pip3-kill-me/duplicate_finder/releases)
+### [v0.0.3 – Release](https://github.com/pip3-kill-me/duplicate_finder/releases)
 
 * Core duplicate detection pipeline (size → chunk → full hash)
 * HTML report with filtering, sorting, and visualization
