@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duplicate File Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #fdfdfd; --text-color: #111; --header-bg: #f2f2f2;
+            --border-color: #ddd; --link-color: #007bff; --code-bg: #eee;
+            --hover-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1e1e1e; --text-color: #f1f1f1; --header-bg: #2c2c2c;
+                --border-color: #444; --link-color: #3498db; --code-bg: #333;
+                --hover-bg: #2a2a2a;
+            }
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            line-height: 1.6; padding: 20px; max-width: 1400px; margin: auto; 
+            background-color: var(--bg-color); color: var(--text-color);
+        }
+        h1, h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        code { background-color: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
+        
+        #summary-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+        #summary ul { list-style-type: none; padding-left: 0; }
+        #chart-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 0.9em; }
+        table th, table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+        table th { background-color: var(--header-bg); cursor: pointer; user-select: none; }
+        table th:hover { background-color: var(--hover-bg); }
+        table th .sort-indicator { float: right; color: #999; }
+        tbody tr:hover { background-color: var(--hover-bg); }
+        .file-name { cursor: help; }
+        .path-col { word-break: break-all; }
+        .size-col { white-space: nowrap; }
+
+        @media (max-width: 800px) {
+            #summary-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Duplicate File Report</h1>
+    
+    <div id="summary-container">
+        <div id="summary"></div>
+        <div id="chart-container">
+            <canvas id="sizeByExtChart"></canvas>
+        </div>
+    </div>
+
+    <table id="duplicatesTable">
+        <thead>
+            <tr>
+                <th data-column="name">File Name <span class="sort-indicator"></span></th>
+                <th data-column="path">Path <span class="sort-indicator"></span></th>
+                <th data-column="size" class="size-col">Size <span class="sort-indicator"></span></th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+        </tbody>
+    </table>
+
+    <script>
+        const reportData = {"dir1":"C:\\Users\\heyth\\Documents\\pasta1","dir2":"C:\\Users\\heyth\\Documents\\pasta2","total_files_checked":62,"total_size_checked":90366634,"total_duplicated_size":50076430,"duplicates":[{"hash":"65f700cc9fb64974e85b2682c446b985e28af383304ff6105c37a3a7b95f9fc9","size":328457,"files":[{"name":"SigmaAudley(SSA)7.9.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"SigmaAudley(SSA)7.9.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"340d80dca7d6b7b0d701a2b028a20fb12b5426963fa9c3a8b254a9d447e48bfd","size":1068522,"files":[{"name":"logo01.jpg","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"jpg"},{"name":"logo01.jpg","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"jpg"}]},{"hash":"fdd33a3447534941071a993a502a3766076ea6acec2727ce12b66e427c6c4c1b","size":579374,"files":[{"name":"c5d07208-526f-46ef-bef4-9d3b80da8bb5.webp","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"webp"},{"name":"c5d07208-526f-46ef-bef4-9d3b80da8bb5.webp","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"webp"}]},{"hash":"05a7880c04780a758e1a3c859d713d877679995a58b0366e8635e6f73f2a5271","size":2974882,"files":[{"name":"geometric-pattern-spiral-neon-gradient-black-background-5k-3840x2160-1202.png","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"png"},{"name":"geometric-pattern-spiral-neon-gradient-black-background-5k-3840x2160-1202.png","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"png"}]},{"hash":"855e4a4c29c583e7eee027e507accc54f47078c4b94acf79f01ee6848eca3d0b","size":1111990,"files":[{"name":"TPS5450.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"TPS5450.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"5c2e3495a9729101205dadc38b0f30133e4f16faeadb0054078dabf4a437b3ac","size":3,"files":[{"name":"New Text Document.txt","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"txt"},{"name":"New Text Document.txt","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"txt"}]},{"hash":"5582ffc4420e2cd8b908dff85672737a02d4254a5ff877567aaca99d80d71bd8","size":1098702,"files":[{"name":"8cf2683a-86c6-406a-9485-75a690465869_animation.mp4","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"mp4"},{"name":"8cf2683a-86c6-406a-9485-75a690465869_animation.mp4","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"mp4"}]},{"hash":"a533d6477fa7b4f9573a54eba2299687945653dae60463a0152f38a9db9a3109","size":859571,"files":[{"name":"445200004_sd.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"445200004_sd.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"d5c273999463c6fadfadb8bc623bc57211630bc1c8afa74398a198db08da784e","size":167423,"files":[{"name":"Trabalho 1 - 40Pts.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"Trabalho 1 - 40Pts.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"1458a166d13cbd675d645bc20fc28acd499da35090f3d7cc509d4b4cc0ddb317","size":309,"files":[{"name":"logo.png","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"png"},{"name":"logo.png","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"png"}]},{"hash":"e692d55ef66149d51352c200f603ba406306258c41e6395648bcc6dc38d0604c","size":4499672,"files":[{"name":"Fundamentals of Precision ADC.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"Fundamentals of Precision ADC.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"fa302b780b9670ed5f6d4e60997ee79eced9c24625f8418932abbe78739d8e34","size":690258,"files":[{"name":"esp32-s3-wroom-2_datasheet_en.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"esp32-s3-wroom-2_datasheet_en.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"9b07b00c9a59c5d430021b786b6ac4ccc36efc49f3e924ff066e89a217ed69bf","size":347969,"files":[{"name":"[HappyFappy][OnlyFans.com] Charlotte Dana aka Candy Nymph @candy_nymph.torrent","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"torrent"},{"name":"[HappyFappy][OnlyFans.com] Charlotte Dana aka Candy Nymph @candy_nymph.torrent","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"torrent"}]},{"hash":"e22f24590970619df5aa38ea31ba1bbd6e2bb1e6bc3da41f5a4b7dc51af77927","size":33887,"files":[{"name":"c25e37837b7c0a60f6fc1e4b8dcd11a5.jpg","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"jpg"},{"name":"c25e37837b7c0a60f6fc1e4b8dcd11a5.jpg","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"jpg"}]},{"hash":"09e60d494ca1e90e7fae9e2fe2bc79818ce4b52210b8380249688ad21b72a762","size":3999823,"files":[{"name":"853797-hd_1920_1080_25fps.mp4","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"mp4"},{"name":"853797-hd_1920_1080_25fps.mp4","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"mp4"}]},{"hash":"2e9f9c0a2d700bd97e490c394ef7d8b55b6939d4ef6fe684158cc63915d1d580","size":3639639,"files":[{"name":"vsc8572.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"vsc8572.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"39ff804c4e7a441bb53c873d7ac95120b91aaa3bbe60fa5607469b294299c32d","size":4145766,"files":[{"name":"853789-hd_1920_1080_25fps.mp4","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"mp4"},{"name":"853789-hd_1920_1080_25fps.mp4","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"mp4"}]},{"hash":"7e417a2d5f09bfdb1db28cab171ebcf61bc71da1af45c8ae9eb964b7926d3742","size":1640855,"files":[{"name":"schematic-design.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"schematic-design.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"e32a3fc1b47f6f394ff6b4ed788b9ec1a422355495909e3b1264b608bf698354","size":120297,"files":[{"name":"[HappyFappy]Molly Little pack HEVC.torrent","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"torrent"},{"name":"[HappyFappy]Molly Little pack HEVC.torrent","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"torrent"}]},{"hash":"f119dde6e7725eec9cd67ff1116f797974f38db868c8980649f47dbfc68fe89d","size":1802456,"files":[{"name":"ads1299.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"ads1299.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"7cc775d64caa498a71f86cad49208e80c27acd0a435d07c05c742eab2642284d","size":1532929,"files":[{"name":"H5007NL.PDF","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"H5007NL.PDF","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"71500b9bb18f67e039ed15caec31569878e03bba4aed8a30e59dfaaa65cfd8cb","size":380506,"files":[{"name":"gatodojorda.png","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"png"},{"name":"gatodojorda.png","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"png"}]},{"hash":"510f2ffdf4da4063da8c86cdfbf0a6eb86a217a6a40a2107395e2915e5c99ef0","size":677592,"files":[{"name":"88LX5152_88LX5153.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"88LX5152_88LX5153.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"9b3f096f270ea8f6361e117687c8fa578fa841d526fd55bee56f28b8e1d7fe4e","size":3879200,"files":[{"name":"763527001_sd (1).pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"763527001_sd.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"763527001_sd (1).pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"},{"name":"763527001_sd.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"84963fdf5f6f3ec4da8a21fd20d1b192023b0b68c244c7263b933a168e436c4f","size":350708,"files":[{"name":"EE-76090-001-001.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"EE-76090-001-001.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"510c624202b4042a421f7d8eebda259f647c9563d6fbf5b2328292397acc13b0","size":1283349,"files":[{"name":"LM27762.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"LM27762.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"1431a395298a6bb70e24372864bbe930762dd365486a79c009df743e2845a202","size":1442033,"files":[{"name":"XCKU060-1FFVA1156I.PDF","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"XCKU060-1FFVA1156I.PDF","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]},{"hash":"a5c2c1d20db48e62967a38a282b407ca6843ed475bf7fb9856e6046139b72f6f","size":620119,"files":[{"name":"cachorrodoandrei.png","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"png"},{"name":"cachorrodoandrei.png","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"png"}]},{"hash":"a63e4bc32f8e35ee2cd14bde6af8a622fd17f8693d6966025e68499f35ba4d32","size":1013913,"files":[{"name":"AS-75310-001-001 (1).pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"AS-75310-001-001.pdf","path":"C:\\Users\\heyth\\Documents\\pasta1","extension":"pdf"},{"name":"AS-75310-001-001 (1).pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"},{"name":"AS-75310-001-001.pdf","path":"C:\\Users\\heyth\\Documents\\pasta2","extension":"pdf"}]}],"size_by_ext":{"jpg":1102409,"mp4":9244291,"pdf":34706271,"png":3975816,"torrent":468266,"txt":3,"webp":579374}};
+
+        window.onload = () => {
+            try {
+                const data = reportData;
+                if (!data || !data.duplicates) {
+                    throw new Error("Embedded data is missing or invalid.");
+                }
+                renderSummary(data);
+                renderTable(data.duplicates);
+                renderChart(data.size_by_ext);
+            } catch (error) {
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="3">Error loading embedded report data: ${error.message}</td></tr>`;
+                console.error("Failed to load or parse embedded data:", error);
+            }
+        };
+
+        function renderSummary(data) {
+            const summaryDiv = document.getElementById('summary');
+            summaryDiv.innerHTML = `
+                <h2>Summary</h2>
+                <ul>
+                    <li><strong>Scanned Directories:</strong> <code>${data.dir1}</code> and <code>${data.dir2}</code></li>
+                    <li><strong>Files Checked:</strong> ${data.total_files_checked.toLocaleString()}</li>
+                    <li><strong>Total Size:</strong> ${formatSize(data.total_size_checked)}</li>
+                    <li><strong>Duplicate Sets Found:</strong> ${data.duplicates.length.toLocaleString()}</li>
+                    <li><strong>Total Duplicated Size:</strong> ${formatSize(data.total_duplicated_size)}</li>
+                </ul>
+            `;
+        }
+        
+        let allFiles = [];
+        function renderTable(duplicateSets) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            
+            allFiles = duplicateSets.flatMap(set => 
+                set.files.map(file => ({ ...file, hash: set.hash, size: set.size }))
+            );
+
+            if (allFiles.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3">No duplicate files found.</td></tr>';
+                return;
+            }
+
+            for (const file of allFiles) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
+                    <td class="path-col"><code>${file.path}</code></td>
+                    <td class="size-col">${formatSize(file.size)}</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        function renderChart(sizeByExt) {
+            const ctx = document.getElementById('sizeByExtChart').getContext('2d');
+            const labels = Object.keys(sizeByExt);
+            const data = Object.values(sizeByExt);
+
+            if (labels.length === 0) {
+                document.getElementById('chart-container').style.display = 'none';
+                return;
+            }
+
+            const chart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Duplicated Size',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+                            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)'
+                        ],
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text-color')
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Duplicated Size by File Extension',
+                            color: getComputedStyle(document.body).getPropertyValue('--text-color')
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += formatSize(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        let sortDirection = {};
+        document.querySelectorAll('#duplicatesTable th').forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.dataset.column;
+                const direction = sortDirection[column] === 'asc' ? 'desc' : 'asc';
+                sortAndRedrawTable(column, direction);
+            });
+        });
+
+        function sortAndRedrawTable(column, direction) {
+            document.querySelectorAll('#duplicatesTable th .sort-indicator').forEach(span => span.textContent = '');
+            sortDirection = { [column]: direction };
+            document.querySelector(`#duplicatesTable th[data-column='${column}'] .sort-indicator`).textContent = direction === 'asc' ? '▲' : '▼';
+
+            allFiles.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+                if (column === 'size') {
+                    return direction === 'asc' ? valA - valB : valB - valA;
+                }
+                return direction === 'asc' 
+                    ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+                    : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            allFiles.forEach(file => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
+                    <td class="path-col"><code>${file.path}</code></td>
+                    <td class="size-col">${formatSize(file.size)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 bytes';
+            const k = 1024;
+            const sizes = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

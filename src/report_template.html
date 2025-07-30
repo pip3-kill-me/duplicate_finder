@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duplicate File Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #fdfdfd; --text-color: #111; --header-bg: #f2f2f2;
+            --border-color: #ddd; --link-color: #007bff; --code-bg: #eee;
+            --hover-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1e1e1e; --text-color: #f1f1f1; --header-bg: #2c2c2c;
+                --border-color: #444; --link-color: #3498db; --code-bg: #333;
+                --hover-bg: #2a2a2a;
+            }
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            line-height: 1.6; padding: 20px; max-width: 1400px; margin: auto; 
+            background-color: var(--bg-color); color: var(--text-color);
+        }
+        h1, h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        code { background-color: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
+        
+        #summary-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+        #summary ul { list-style-type: none; padding-left: 0; }
+        #chart-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 0.9em; }
+        table th, table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+        table th { background-color: var(--header-bg); cursor: pointer; user-select: none; }
+        table th:hover { background-color: var(--hover-bg); }
+        table th .sort-indicator { float: right; color: #999; }
+        tbody tr:hover { background-color: var(--hover-bg); }
+        .file-name { cursor: help; }
+        .path-col { word-break: break-all; }
+        .size-col { white-space: nowrap; }
+
+        @media (max-width: 800px) {
+            #summary-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Duplicate File Report</h1>
+    
+    <div id="summary-container">
+        <div id="summary"></div>
+        <div id="chart-container">
+            <canvas id="sizeByExtChart"></canvas>
+        </div>
+    </div>
+
+    <table id="duplicatesTable">
+        <thead>
+            <tr>
+                <th data-column="name">File Name <span class="sort-indicator"></span></th>
+                <th data-column="path">Path <span class="sort-indicator"></span></th>
+                <th data-column="size" class="size-col">Size <span class="sort-indicator"></span></th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+        </tbody>
+    </table>
+
+    <script>
+        const reportData = /*__JSON_DATA_PLACEHOLDER__*/{};
+
+        window.onload = () => {
+            try {
+                const data = reportData;
+                if (!data || !data.duplicates) {
+                    throw new Error("Embedded data is missing or invalid.");
+                }
+                renderSummary(data);
+                renderTable(data.duplicates);
+                renderChart(data.size_by_ext);
+            } catch (error) {
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="3">Error loading embedded report data: ${error.message}</td></tr>`;
+                console.error("Failed to load or parse embedded data:", error);
+            }
+        };
+
+        function renderSummary(data) {
+            const summaryDiv = document.getElementById('summary');
+            summaryDiv.innerHTML = `
+                <h2>Summary</h2>
+                <ul>
+                    <li><strong>Scanned Directories:</strong> <code>${data.dir1}</code> and <code>${data.dir2}</code></li>
+                    <li><strong>Files Checked:</strong> ${data.total_files_checked.toLocaleString()}</li>
+                    <li><strong>Total Size:</strong> ${formatSize(data.total_size_checked)}</li>
+                    <li><strong>Duplicate Sets Found:</strong> ${data.duplicates.length.toLocaleString()}</li>
+                    <li><strong>Total Duplicated Size:</strong> ${formatSize(data.total_duplicated_size)}</li>
+                </ul>
+            `;
+        }
+        
+        let allFiles = [];
+        function renderTable(duplicateSets) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            
+            allFiles = duplicateSets.flatMap(set => 
+                set.files.map(file => ({ ...file, hash: set.hash, size: set.size }))
+            );
+
+            if (allFiles.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3">No duplicate files found.</td></tr>';
+                return;
+            }
+
+            for (const file of allFiles) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
+                    <td class="path-col"><code>${file.path}</code></td>
+                    <td class="size-col">${formatSize(file.size)}</td>
+                `;
+                tableBody.appendChild(row);
+            }
+        }
+
+        function renderChart(sizeByExt) {
+            const ctx = document.getElementById('sizeByExtChart').getContext('2d');
+            const labels = Object.keys(sizeByExt);
+            const data = Object.values(sizeByExt);
+
+            if (labels.length === 0) {
+                document.getElementById('chart-container').style.display = 'none';
+                return;
+            }
+
+            const chart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Duplicated Size',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+                            'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)'
+                        ],
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text-color')
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Duplicated Size by File Extension',
+                            color: getComputedStyle(document.body).getPropertyValue('--text-color')
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += formatSize(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        let sortDirection = {};
+        document.querySelectorAll('#duplicatesTable th').forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.dataset.column;
+                const direction = sortDirection[column] === 'asc' ? 'desc' : 'asc';
+                sortAndRedrawTable(column, direction);
+            });
+        });
+
+        function sortAndRedrawTable(column, direction) {
+            document.querySelectorAll('#duplicatesTable th .sort-indicator').forEach(span => span.textContent = '');
+            sortDirection = { [column]: direction };
+            document.querySelector(`#duplicatesTable th[data-column='${column}'] .sort-indicator`).textContent = direction === 'asc' ? '▲' : '▼';
+
+            allFiles.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+                if (column === 'size') {
+                    return direction === 'asc' ? valA - valB : valB - valA;
+                }
+                return direction === 'asc' 
+                    ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' })
+                    : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            allFiles.forEach(file => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="file-name" title="Hash: ${file.hash}"><code>${file.name}</code></td>
+                    <td class="path-col"><code>${file.path}</code></td>
+                    <td class="size-col">${formatSize(file.size)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 bytes';
+            const k = 1024;
+            const sizes = ['bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
